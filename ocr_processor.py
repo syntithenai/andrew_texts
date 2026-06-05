@@ -16,7 +16,7 @@ IMAGE_FOLDER = Path("./images")
 TEXT_FOLDER = Path("./texts")
 KEYWORDS_FOLDER = Path("./keywords")
 MASTER_KEYWORDS_FILE = Path("./master_keywords.json")
-HTML_OUTPUT = Path("./docs/index.html")
+HTML_OUTPUT = Path("./index.html")
 
 IMAGE_FOLDER.mkdir(parents=True, exist_ok=True)
 TEXT_FOLDER.mkdir(parents=True, exist_ok=True)
