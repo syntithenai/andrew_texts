@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Andrews Meanderings</title>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <style>
+        :root {
+            --bg: #f3f6f2;
+            --text: #1d2a1f;
+            --panel: #ffffff;
+            --accent: #2f6f4f;
+            --accent-2: #6f9e7f;
+            --line: #dbe6dd;
+        }
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body { font-family: "Trebuchet MS", "Segoe UI", sans-serif; margin: 24px; background: radial-gradient(circle at top, #edf7ef, var(--bg)); color: var(--text); }
+        .page-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+        h1 { margin: 0; color: #122017; letter-spacing: 0.4px; font-size: 2rem; }
+        .header-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .group-nav, .action-btn { border: 0; border-radius: 8px; background: linear-gradient(120deg, var(--accent), var(--accent-2)); color: #fff; padding: 10px 14px; font-size: 14px; font-weight: 700; }
+        .group-nav { max-width: 240px; }
+        .action-btn { cursor: pointer; }
+        .action-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .complete-toggle { min-width: 150px; }
+        .report { display: flex; flex-direction: column; gap: 18px; padding-bottom: 40px; }
+        .group-section { background: rgba(255, 255, 255, 0.72); border: 1px solid rgba(219, 230, 221, 0.85); border-radius: 14px; box-shadow: 0 12px 30px rgba(14, 31, 18, 0.08); overflow: hidden; }
+        .group-header { padding: 14px 18px; background: linear-gradient(120deg, rgba(47, 111, 79, 0.12), rgba(111, 158, 127, 0.18)); border-bottom: 1px solid rgba(219, 230, 221, 0.85); font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #21382a; }
+        .group-header small { text-transform: none; letter-spacing: 0; font-weight: 600; color: #587062; }
+        .group-items { display: flex; flex-direction: column; gap: 18px; padding: 18px; }
+        .image-entry { display: grid; grid-template-columns: minmax(280px, 44%) 1fr; gap: 18px; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: 0 6px 18px rgba(9, 22, 13, 0.05); position: relative; }
+        .image-entry.complete { outline: 2px solid rgba(47, 111, 79, 0.18); }
+        .hide-complete .image-entry.complete { display: none; }
+        .image-panel { position: relative; }
+        .complete-checkbox { position: absolute; top: 12px; left: 12px; z-index: 3; display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.92); border: 1px solid rgba(219, 230, 221, 0.95); font-size: 12px; font-weight: 700; color: #284235; }
+        .complete-checkbox input { margin: 0; }
+        .image-modal-trigger { all: unset; display: block; width: 100%; cursor: zoom-in; }
+        .text-editor { width: 100%; min-height: 180px; border: 1px solid var(--line); border-radius: 8px; padding: 14px; font-size: 15px; line-height: 1.6; font-family: inherit; white-space: pre-wrap; resize: none; box-sizing: border-box; }
+        .image-preview { width: 100%; display: block; max-height: 700px; object-fit: contain; border: 1px solid #ddd; border-radius: 10px; }
+        .filename-header { margin-bottom: 10px; font-weight: bold; font-size: 14px; color: #333; }
+        .keyword-badge { display: inline-block; background: #e0f2fe; color: #0369a1; font-size: 12px; font-weight: 600; padding: 4px 8px; margin: 2px; border-radius: 12px; }
+        .keyword-container { background: #f8fafc; padding: 10px 14px; border: 1px solid #dfe8e1; border-radius: 10px; margin: 0 0 14px; }
+        .media-controls { margin-top: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .record-btn, .play-btn { border: 0; border-radius: 6px; padding: 8px 12px; color: #fff; font-weight: 700; cursor: pointer; }
+        .record-btn { background: #c1352a; }
+        .record-btn.recording { background: #8f241f; }
+        .play-btn { background: #2f6f4f; }
+        .play-btn[hidden] { display: none; }
+        .recording-status { font-size: 13px; color: #425447; }
+        .modal-backdrop { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(4, 17, 8, 0.82); z-index: 9999; padding: 24px; box-sizing: border-box; }
+        .modal-backdrop.open { display: flex; }
+        .modal-content { position: relative; max-width: 96vw; max-height: 96vh; background: #fff; border-radius: 12px; padding: 12px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35); }
+        .modal-content img { display: block; max-width: calc(96vw - 24px); max-height: calc(96vh - 24px); object-fit: contain; }
+        .modal-close { position: absolute; top: 8px; right: 8px; border: 0; border-radius: 999px; width: 34px; height: 34px; background: rgba(47, 111, 79, 0.95); color: #fff; font-size: 18px; line-height: 34px; cursor: pointer; }
+        .empty-state { padding: 18px; color: #4b6150; font-style: italic; }
+        @media (max-width: 900px) { body { margin: 16px; } .page-header { align-items: flex-start; } .image-entry { grid-template-columns: 1fr; } .text-editor { min-height: 220px; } }
+    </style>
+</head>
+<body>
+    <div class="page-header">
+        <h1>Andrews Meanderings</h1>
+        <div class="header-tools">
+            <select id="group-nav" class="group-nav" aria-label="Jump to group"></select>
+            <button id="toggle-complete" class="action-btn complete-toggle" type="button">Hide Complete</button>
+            <button id="download-all-recordings" class="action-btn" type="button">Download Texts + Recordings (.zip)</button>
+        </div>
+    </div>
+    <div id="image-modal" class="modal-backdrop" aria-hidden="true">
+        <div class="modal-content" role="dialog" aria-modal="true">
+            <button id="image-modal-close" class="modal-close" type="button" aria-label="Close image">×</button>
+            <img id="image-modal-img" alt="Expanded image">
+        </div>
+    </div>
+    <div id="report" class="report"></div>
+
+    <script>
+        (function () {
+            const TEXT_KEY_PREFIX = "ocr_text_";
+            const AUDIO_KEY_PREFIX = "ocr_audio_";
+            const COMPLETE_KEY_PREFIX = "ocr_complete_";
+            const SHOW_COMPLETE_KEY = "ocr_show_complete";
+            const RECORDING_TYPE = "audio/webm";
+            const pageData = [{"relativeImagePath": "green book/PXL_20260605_051332250.jpg", "displayImagePath": "../images/green book/PXL_20260605_051332250.jpg", "filename": "PXL_20260605_051332250.jpg", "groupKey": "green book", "groupLabel": "green book", "groupId": "group-green book", "text": "Life is endowed with many chapters.\nAll part of a story that makes up one's life.\nSeeking closure to certain chapters in one's life\ncan be quite challenging. To move forward from\nthe last chapter or seek a change in how the\nstory goes, can prove to be very difficult, but\nnot impossible!\nThe tumultuousness of life conjures many emotions.\nSome with reprehensible regret.\nOh! But how to reconcile with ones being?\nParticularly when clarity to adequately\nreview one's whole state of being, becomes\nimpaired due to extraneous forces beyond one's\nphysical, mental, emotional & spiritual control.\nHow to effectively solve lifes little quandaries\nrequires many manipulations of mind, alliance,\nlifestyle, occupation, interests etc...\nWe have facility to influence change and\nbe influenced to make change.\nTo learn from others, experience something\nnew every day, contributes to an ever changing\nstate of mind. After all, it is plasticity of mind\nthat allows for manipulation to occur.\nThe power of suggestability! We are bombarded\nwith suggestion every day. It is one's own choice\nwhat to do or not.\nHowever, the winds of change that influence\nlife's choices can manifest, yet another chapter.\nSo too, those same winds of change can\nblow us into disarray. Only to start yet,\nanother chapter.\nAndrew Kordas 2014", "keywords": ["life", "chapters", "story", "closure", "change", "emotions", "regret", "being", "clarity", "mind", "plasticity", "suggestibility", "influence", "change", "winds of change", "Andrew Kordas", "2014"], "modifiedTime": 1780669631.945279}, {"relativeImagePath": "PXL_20260605_051346262.jpg", "displayImagePath": "../images/PXL_20260605_051346262.jpg", "filename": "PXL_20260605_051346262.jpg", "groupKey": "", "groupLabel": "none", "groupId": "group-none", "text": "To my Godchild from your God parent.\nFrom my god father to his Godson\nYou are an extraordinary man\nEndowed with many talents\nSome refined and rare\nHone those talents refine those\nskills and you\nshall be appreciated.\nYou may choose to be dwell\nin a world of your own\nBut you live in a world\nfull of others.\nAll those others, friend or foe\ncovers those you don't know\nThey are your brothers of sisters\nThey're of a bigger family\nto which you belong.\nYou'll encounter love &\nexperience it.\nLove is patient Love is kind\nI experience in love will conquer\nMany emotions\nKindness in love can be cruel.\nYou'll meet\nand cherish the treasure\nBut within the trash\nThere's treasure to be found\nYou are a gem\nYour many facets\nWill shine and reflect\nWith a clarity specific to\nyou.", "keywords": ["Godchild", "Godparent", "Godson", "Godfather", "extraordinary", "talents", "skills", "appreciation", "world", "others", "brothers", "sisters", "family", "love", "patience", "kindness", "emotions", "treasure", "trash", "gem", "facets", "clarity", "reflection"], "modifiedTime": 1780669633.4081407}, {"relativeImagePath": "PXL_20260605_051352767.jpg", "displayImagePath": "../images/PXL_20260605_051352767.jpg", "filename": "PXL_20260605_051352767.jpg", "groupKey": "", "groupLabel": "none", "groupId": "group-none", "text": "I don't understand it now\nThat works\nIt just happened\nI'd like to think that maybe\nsomething was learnt\nalong the way\nIt's when the unexpected occurs\nIt's what incites reaction.\nfight or flight\nIt's not new\nThat's just being human\nwe all have different reactions\nto any given circumstance\nBeing humble gave way to\nfellowness\nWhich allowed the flowers to\ndeepen\nAnd into the abyss one falls\nWhen one falls we clutch\non to whatever might give us\nsome extra strength.\nPush away that which makes\nus go with what makes us\nstrong?\nMakes one question, where\none belongs\nNot feel not so good.\nSometimes bad sometimes good\nAlways bad always good.", "keywords": ["unexpected", "reaction", "fight or flight", "human", "reactions", "humility", "fellowship", "flowers", "abyss", "strength", "belonging", "question", "good", "bad"], "modifiedTime": 1780669634.972993}, {"relativeImagePath": "seven dollar book/PXL_20260605_051321027.jpg", "displayImagePath": "../images/seven dollar book/PXL_20260605_051321027.jpg", "filename": "PXL_20260605_051321027.jpg", "groupKey": "seven dollar book", "groupLabel": "seven dollar book", "groupId": "group-seven dollar book", "text": "Some truths may upset us\nThey maybe you don't know\nLearn them\n\nAn expression of a point\nof view is not\nnecessarily a personal attack\nI can see how it can\nbe viewed as that\nOur perspectives were different\nwe were both on the same\npage\nOne was on the front\nthe other on the back\nSomewhere on the edges\nwe met\nAnd those edges became\nfrayed\nTattered\nTorn\nInto asunder our shattered\nsouls lay worn\n\nout\nWaiting for something to\nrupture the bland\nAnd change occurred\nforming enchorers hand\nThose forces conflicted\nwitheld and inflicted\npain to much to bear\non account of too much\nThe agony to store\nThe grief\nand the sorrow\nThen cast into the pit\nof despair", "keywords": ["truth", "perspective", "viewpoint", "personal attack", "difference", "agony", "grief", "sorrow", "despair", "conflict", "pain", "shattered", "souls", "rupture", "change", "frayed", "tattered", "torn", "enchorers hand", "pit"], "modifiedTime": 1780669630.104453}];
+            const report = document.getElementById("report");
+            const groupNav = document.getElementById("group-nav");
+            const downloadButton = document.getElementById("download-all-recordings");
+            const toggleCompleteButton = document.getElementById("toggle-complete");
+            const imageModal = document.getElementById("image-modal");
+            const imageModalImg = document.getElementById("image-modal-img");
+            const imageModalClose = document.getElementById("image-modal-close");
+            const groups = new Map();
+            const groupOrder = [];
+
+            function storageKey(prefix, fileKey) {
+                return prefix + fileKey;
+            }
+
+            function resizeEditor(editor) {
+                editor.style.height = "auto";
+                editor.style.height = `${editor.scrollHeight}px`;
+            }
+
+            function openImageModal(src, alt) {
+                imageModalImg.src = src;
+                imageModalImg.alt = alt;
+                imageModal.classList.add("open");
+                imageModal.setAttribute("aria-hidden", "false");
+            }
+
+            function closeImageModal() {
+                imageModal.classList.remove("open");
+                imageModal.setAttribute("aria-hidden", "true");
+                imageModalImg.removeAttribute("src");
+            }
+
+            function isShowingComplete() {
+                return localStorage.getItem(SHOW_COMPLETE_KEY) !== "false";
+            }
+
+            function applyCompleteVisibility() {
+                document.body.classList.toggle("hide-complete", !isShowingComplete());
+                toggleCompleteButton.textContent = isShowingComplete() ? "Hide Complete" : "Show Complete";
+            }
+
+            function updateCompleteState(entry, suppressHideUpdate = false) {
+                const isComplete = entry.completeCheckbox.checked;
+                entry.element.classList.toggle("complete", isComplete);
+                localStorage.setItem(storageKey(COMPLETE_KEY_PREFIX, entry.fileKey), isComplete ? "true" : "false");
+                if (!suppressHideUpdate) {
+                    entry.element.classList.toggle("hidden-by-toggle", !isShowingComplete() && isComplete);
+                }
+            }
+
+            function updatePlayButtonLabel(audio, button) {
+                button.textContent = audio.paused ? "Play" : "Stop";
+            }
+
+            function dataUrlToBlob(dataUrl) {
+                const parts = dataUrl.split(",");
+                const mime = parts[0].match(/:(.*?);/)[1];
+                const bytes = atob(parts[1]);
+                const arr = new Uint8Array(bytes.length);
+                for (let i = 0; i < bytes.length; i += 1) {
+                    arr[i] = bytes.charCodeAt(i);
+                }
+                return new Blob([arr], { type: mime });
+            }
+
+            function toZipPath(folderName, relativeImagePath, extension) {
+                return `${folderName}/${relativeImagePath.replace(/\.[^.]+$/, extension)}`;
+            }
+
+            function buildEntry(item) {
+                const entry = document.createElement("article");
+                entry.className = "image-entry";
+                entry.dataset.groupId = item.groupId;
+                entry.dataset.fileKey = item.relativeImagePath;
+
+                const imagePanel = document.createElement("div");
+                imagePanel.className = "image-panel";
+
+                const completeLabel = document.createElement("label");
+                completeLabel.className = "complete-checkbox";
+
+                const completeCheckbox = document.createElement("input");
+                completeCheckbox.type = "checkbox";
+                completeCheckbox.dataset.completeCheckbox = "true";
+                completeCheckbox.checked = localStorage.getItem(storageKey(COMPLETE_KEY_PREFIX, item.relativeImagePath)) === "true";
+
+                const completeText = document.createElement("span");
+                completeText.textContent = "Complete";
+                completeLabel.appendChild(completeCheckbox);
+                completeLabel.appendChild(completeText);
+
+                const imageButton = document.createElement("button");
+                imageButton.type = "button";
+                imageButton.className = "image-modal-trigger";
+                imageButton.dataset.imageModalTrigger = "true";
+                imageButton.dataset.imageSrc = item.displayImagePath;
+                imageButton.dataset.imageAlt = item.filename;
+
+                const image = document.createElement("img");
+                image.className = "image-preview";
+                image.src = `${item.displayImagePath}?v=${item.modifiedTime}`;
+                image.alt = item.filename;
+                image.loading = "lazy";
+                imageButton.appendChild(image);
+
+                imagePanel.appendChild(completeLabel);
+                imagePanel.appendChild(imageButton);
+
+                const textPane = document.createElement("div");
+                textPane.className = "text-pane";
+
+                const filenameHeader = document.createElement("div");
+                filenameHeader.className = "filename-header";
+                filenameHeader.textContent = `File: ${item.relativeImagePath}`;
+
+                const keywordContainer = document.createElement("div");
+                keywordContainer.className = "keyword-container";
+                const keywordLabel = document.createElement("strong");
+                keywordLabel.textContent = "Keywords:";
+                keywordContainer.appendChild(keywordLabel);
+                if (item.keywords.length) {
+                    item.keywords.forEach((keyword) => {
+                        const badge = document.createElement("span");
+                        badge.className = "keyword-badge";
+                        badge.textContent = keyword;
+                        keywordContainer.appendChild(badge);
+                    });
+                } else {
+                    keywordContainer.appendChild(document.createTextNode(" None"));
+                }
+
+                const editor = document.createElement("textarea");
+                editor.className = "text-editor";
+                editor.dataset.textEditor = "true";
+                editor.dataset.fileKey = item.relativeImagePath;
+                editor.value = localStorage.getItem(storageKey(TEXT_KEY_PREFIX, item.relativeImagePath)) ?? item.text;
+
+                textPane.appendChild(filenameHeader);
+                textPane.appendChild(keywordContainer);
+                textPane.appendChild(editor);
+
+                const controls = document.createElement("div");
+                controls.className = "media-controls";
+                controls.dataset.recordingControls = "true";
+
+                const recordButton = document.createElement("button");
+                recordButton.className = "record-btn";
+                recordButton.type = "button";
+                recordButton.textContent = "Record";
+
+                const playButton = document.createElement("button");
+                playButton.className = "play-btn";
+                playButton.type = "button";
+                playButton.textContent = "Play";
+
+                const status = document.createElement("span");
+                status.className = "recording-status";
+                status.textContent = "No recording";
+
+                const audio = document.createElement("audio");
+                audio.preload = "none";
+
+                const existingRecording = localStorage.getItem(storageKey(AUDIO_KEY_PREFIX, item.relativeImagePath));
+                if (existingRecording) {
+                    audio.src = existingRecording;
+                    playButton.hidden = false;
+                    status.textContent = "Recording saved";
+                } else {
+                    playButton.hidden = true;
+                }
+
+                controls.appendChild(recordButton);
+                controls.appendChild(playButton);
+                controls.appendChild(status);
+                controls.appendChild(audio);
+                textPane.appendChild(controls);
+
+                entry.appendChild(imagePanel);
+                entry.appendChild(textPane);
+
+                const entryRef = {
+                    element: entry,
+                    fileKey: item.relativeImagePath,
+                    completeCheckbox,
+                    recordButton,
+                    playButton,
+                    audio,
+                    status,
+                    editor,
+                };
+
+                resizeEditor(editor);
+                editor.addEventListener("input", () => {
+                    localStorage.setItem(storageKey(TEXT_KEY_PREFIX, item.relativeImagePath), editor.value);
+                    resizeEditor(editor);
+                });
+
+                completeCheckbox.addEventListener("change", () => {
+                    updateCompleteState(entryRef);
+                });
+
+                playButton.addEventListener("click", () => {
+                    if (audio.paused) {
+                        audio.currentTime = 0;
+                        audio.play();
+                    } else {
+                        audio.pause();
+                    }
+                });
+
+                audio.addEventListener("play", () => updatePlayButtonLabel(audio, playButton));
+                audio.addEventListener("pause", () => updatePlayButtonLabel(audio, playButton));
+                audio.addEventListener("ended", () => updatePlayButtonLabel(audio, playButton));
+
+                let mediaRecorder = null;
+                let chunks = [];
+
+                recordButton.addEventListener("click", async () => {
+                    if (mediaRecorder && mediaRecorder.state === "recording") {
+                        mediaRecorder.stop();
+                        return;
+                    }
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        chunks = [];
+                        mediaRecorder = new MediaRecorder(stream, { mimeType: RECORDING_TYPE });
+
+                        mediaRecorder.addEventListener("dataavailable", (event) => {
+                            if (event.data && event.data.size > 0) {
+                                chunks.push(event.data);
+                            }
+                        });
+
+                        mediaRecorder.addEventListener("stop", () => {
+                            const blob = new Blob(chunks, { type: RECORDING_TYPE });
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                                const dataUrl = reader.result;
+                                localStorage.setItem(storageKey(AUDIO_KEY_PREFIX, item.relativeImagePath), dataUrl);
+                                audio.src = dataUrl;
+                                playButton.hidden = false;
+                                status.textContent = "Recording saved";
+                                updatePlayButtonLabel(audio, playButton);
+                            };
+                            reader.readAsDataURL(blob);
+                            stream.getTracks().forEach((track) => track.stop());
+                            recordButton.classList.remove("recording");
+                            recordButton.textContent = "Record";
+                        });
+
+                        mediaRecorder.start();
+                        recordButton.classList.add("recording");
+                        recordButton.textContent = "Stop";
+                        status.textContent = "Recording...";
+                    } catch (error) {
+                        status.textContent = "Microphone unavailable";
+                    }
+                });
+
+                updateCompleteState(entryRef, true);
+                entry.classList.toggle("hidden-by-toggle", !isShowingComplete() && completeCheckbox.checked);
+                return entryRef;
+            }
+
+            function renderPage() {
+                const grouped = new Map();
+                pageData.forEach((item) => {
+                    if (!grouped.has(item.groupId)) {
+                        grouped.set(item.groupId, {
+                            groupId: item.groupId,
+                            groupLabel: item.groupLabel,
+                            items: [],
+                        });
+                        groupOrder.push(item.groupId);
+                    }
+                    grouped.get(item.groupId).items.push(item);
+                });
+                const orderedGroupIds = Array.from(grouped.keys()).sort((left, right) => {
+                    if (left === "group-none") {
+                        return -1;
+                    }
+                    if (right === "group-none") {
+                        return 1;
+                    }
+                    return grouped.get(left).groupLabel.localeCompare(grouped.get(right).groupLabel);
+                });
+
+                if (pageData.length === 0) {
+                    const empty = document.createElement("div");
+                    empty.className = "empty-state";
+                    empty.textContent = "No images were found.";
+                    report.appendChild(empty);
+                    return;
+                }
+
+                groupNav.appendChild(new Option("Jump to subfolder", "", true, true));
+
+                orderedGroupIds.forEach((groupId) => {
+                    const group = grouped.get(groupId);
+                    const section = document.createElement("section");
+                    section.className = "group-section";
+                    section.id = groupId;
+
+                    const header = document.createElement("div");
+                    header.className = "group-header";
+                    header.textContent = group.groupLabel === "none" ? "none" : group.groupLabel;
+
+                    const headerNote = document.createElement("small");
+                    headerNote.textContent = group.groupLabel === "none" ? " top-level images" : " subfolder";
+                    header.appendChild(document.createTextNode(" "));
+                    header.appendChild(headerNote);
+
+                    const items = document.createElement("div");
+                    items.className = "group-items";
+
+                    group.items.forEach((item) => {
+                        const entry = buildEntry(item);
+                        items.appendChild(entry.element);
+                    });
+
+                    section.appendChild(header);
+                    section.appendChild(items);
+                    report.appendChild(section);
+                    groupNav.appendChild(new Option(group.groupLabel, groupId));
+                });
+            }
+
+            renderPage();
+            applyCompleteVisibility();
+
+            groupNav.addEventListener("change", () => {
+                if (!groupNav.value) {
+                    return;
+                }
+                const target = document.getElementById(groupNav.value);
+                if (target) {
+                    target.scrollIntoView({ behavior: "smooth", block: "start" });
+                }
+            });
+
+            toggleCompleteButton.addEventListener("click", () => {
+                localStorage.setItem(SHOW_COMPLETE_KEY, isShowingComplete() ? "false" : "true");
+                applyCompleteVisibility();
+            });
+
+            document.addEventListener("click", (event) => {
+                const trigger = event.target.closest("[data-image-modal-trigger]");
+                if (trigger) {
+                    openImageModal(trigger.dataset.imageSrc, trigger.dataset.imageAlt || "Expanded image");
+                    return;
+                }
+                if (event.target === imageModal) {
+                    closeImageModal();
+                }
+            });
+
+            imageModalClose.addEventListener("click", closeImageModal);
+
+            document.addEventListener("keydown", (event) => {
+                if (event.key === "Escape" && imageModal.classList.contains("open")) {
+                    closeImageModal();
+                }
+            });
+
+            downloadButton.addEventListener("click", async () => {
+                const zip = new JSZip();
+                document.querySelectorAll(".image-entry").forEach((entry) => {
+                    const fileKey = entry.dataset.fileKey;
+                    const editor = entry.querySelector("[data-text-editor]");
+                    const recordingDataUrl = localStorage.getItem(storageKey(AUDIO_KEY_PREFIX, fileKey));
+                    zip.file(toZipPath("texts", fileKey, ".txt"), editor.value);
+                    if (recordingDataUrl) {
+                        zip.file(toZipPath("recordings", fileKey, ".webm"), dataUrlToBlob(recordingDataUrl));
+                    }
+                });
+
+                const content = await zip.generateAsync({ type: "blob" });
+                const url = URL.createObjectURL(content);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = "andrews-meanderings-export.zip";
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(url);
+            });
+        })();
+    </script>
+</body>
+</html>
